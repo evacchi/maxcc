@@ -23,14 +23,7 @@ passes; they don't grow existing ones.
 
 ## Chapters
 
-1. One thread stores a constant. Params, state spaces, `ld`/`st`/`cvta`.
-2. `thread_idx.x`: many threads, special registers, address arithmetic.
-3. Expressions, `block_idx`/`block_dim`: grids, 32/64-bit widening.
-4. `if`: predicates, branches, divergence.
-5. `let` and assignments: registers vs memory.
-6. `while`: loops, convergence.
-7. `shared` memory and barriers.
-8. f32, then vector add, reductions, tiled matmul: coalescing and occupancy.
+See `docs/toc.md` for the plan and status. Guides: `docs/chNN.md`.
 
 Shelved: an interpreter for the PTX we emit, to test locally and to model
 warps and divergence by hand.
