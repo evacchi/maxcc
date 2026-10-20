@@ -120,7 +120,10 @@ mod tests {
         let want = Kernel {
             name: "answer".into(),
             params: vec![Param { name: "out".into() }],
-            body: vec![Stmt::Store { ptr: "out".into(), value: 42 }],
+            body: vec![Stmt::Store {
+                ptr: "out".into(),
+                value: 42,
+            }],
         };
         assert_eq!(p.kernel, want);
     }

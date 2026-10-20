@@ -22,7 +22,11 @@ pub fn emit(m: &Module) -> String {
 fn entry(out: &mut String, e: &Entry) {
     // Signature.
     writeln!(out, ".visible .entry {}(", e.name).unwrap();
-    let params: Vec<String> = e.params.iter().map(|p| format!("\t.param {} {}", ty(p.ty), p.name)).collect();
+    let params: Vec<String> = e
+        .params
+        .iter()
+        .map(|p| format!("\t.param {} {}", ty(p.ty), p.name))
+        .collect();
     writeln!(out, "{}", params.join(",\n")).unwrap();
     writeln!(out, ")").unwrap();
     writeln!(out, "{{").unwrap();
@@ -47,10 +51,24 @@ fn entry(out: &mut String, e: &Entry) {
 
 fn inst(i: &Inst) -> String {
     match i {
-        Inst::Ld { space: sp, ty: t, dst, addr: a } => format!("ld{}{} \t{}, {}", space(*sp), ty(*t), reg(*dst), addr(a)),
-        Inst::St { space: sp, ty: t, addr: a, src } => format!("st{}{} \t{}, {}", space(*sp), ty(*t), addr(a), operand(src)),
+        Inst::Ld {
+            space: sp,
+            ty: t,
+            dst,
+            addr: a,
+        } => format!("ld{}{} \t{}, {}", space(*sp), ty(*t), reg(*dst), addr(a)),
+        Inst::St {
+            space: sp,
+            ty: t,
+            addr: a,
+            src,
+        } => format!("st{}{} \t{}, {}", space(*sp), ty(*t), addr(a), operand(src)),
         Inst::Mov { ty: t, dst, src } => format!("mov{} \t{}, {}", ty(*t), reg(*dst), operand(src)),
-        Inst::CvtaTo { space: sp, dst, src } => format!("cvta.to{}.u64 \t{}, {}", space(*sp), reg(*dst), reg(*src)),
+        Inst::CvtaTo {
+            space: sp,
+            dst,
+            src,
+        } => format!("cvta.to{}.u64 \t{}, {}", space(*sp), reg(*dst), reg(*src)),
         Inst::Ret => "ret".into(),
     }
 }
@@ -68,7 +86,10 @@ fn regs(i: &Inst) -> Vec<Reg> {
 
     match i {
         Inst::Ld { dst, addr, .. } => [Some(*dst), addr_reg(addr)].into_iter().flatten().collect(),
-        Inst::St { addr, src, .. } => [addr_reg(addr), op_reg(src)].into_iter().flatten().collect(),
+        Inst::St { addr, src, .. } => [addr_reg(addr), op_reg(src)]
+            .into_iter()
+            .flatten()
+            .collect(),
         Inst::Mov { dst, src, .. } => [Some(*dst), op_reg(src)].into_iter().flatten().collect(),
         Inst::CvtaTo { dst, src, .. } => vec![*dst, *src],
         Inst::Ret => vec![],
@@ -122,14 +143,30 @@ mod tests {
 
     #[test]
     fn emits_entry() {
-        let rd = |n| Reg { class: RegClass::B64, n };
+        let rd = |n| Reg {
+            class: RegClass::B64,
+            n,
+        };
         let m = Module {
             entry: Entry {
                 name: "k".into(),
-                params: vec![Param { name: "k_param_0".into(), ty: Type::U64 }],
+                params: vec![Param {
+                    name: "k_param_0".into(),
+                    ty: Type::U64,
+                }],
                 body: vec![
-                    Inst::Ld { space: Space::Param, ty: Type::U64, dst: rd(1), addr: Addr::Param("k_param_0".into()) },
-                    Inst::St { space: Space::Global, ty: Type::U32, addr: Addr::Reg(rd(1)), src: Operand::Imm(7) },
+                    Inst::Ld {
+                        space: Space::Param,
+                        ty: Type::U64,
+                        dst: rd(1),
+                        addr: Addr::Param("k_param_0".into()),
+                    },
+                    Inst::St {
+                        space: Space::Global,
+                        ty: Type::U32,
+                        addr: Addr::Reg(rd(1)),
+                        src: Operand::Imm(7),
+                    },
                     Inst::Ret,
                 ],
             },

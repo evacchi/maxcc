@@ -26,7 +26,11 @@ pub struct Token {
 }
 
 pub fn lex(src: &str) -> Result<Vec<Token>, Error> {
-    let mut lx = Lexer { chars: src.chars().collect(), at: 0, pos: Pos { line: 1, col: 1 } };
+    let mut lx = Lexer {
+        chars: src.chars().collect(),
+        at: 0,
+        pos: Pos { line: 1, col: 1 },
+    };
     let mut out = Vec::new();
 
     loop {
@@ -110,7 +114,9 @@ impl Lexer {
         if !s.chars().all(|c| c.is_ascii_digit()) {
             return Err(Error::new(pos, format!("invalid number '{s}'")));
         }
-        s.parse().map(Tok::Int).map_err(|_| Error::new(pos, format!("'{s}' does not fit in u32")))
+        s.parse()
+            .map(Tok::Int)
+            .map_err(|_| Error::new(pos, format!("'{s}' does not fit in u32")))
     }
 
     fn punct(&mut self) -> Result<Tok, Error> {

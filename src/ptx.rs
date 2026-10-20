@@ -67,9 +67,19 @@ pub enum Addr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Inst {
     /// `ld.<space>.<ty> dst, [addr];`
-    Ld { space: Space, ty: Type, dst: Reg, addr: Addr },
+    Ld {
+        space: Space,
+        ty: Type,
+        dst: Reg,
+        addr: Addr,
+    },
     /// `st.<space>.<ty> [addr], src;`
-    St { space: Space, ty: Type, addr: Addr, src: Operand },
+    St {
+        space: Space,
+        ty: Type,
+        addr: Addr,
+        src: Operand,
+    },
     /// `mov.<ty> dst, src;`
     Mov { ty: Type, dst: Reg, src: Operand },
     /// `cvta.to.<space>.u64 dst, src;` generic address -> `space` address.

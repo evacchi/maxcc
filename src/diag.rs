@@ -16,7 +16,10 @@ pub struct Error {
 
 impl Error {
     pub fn new(pos: Pos, msg: impl Into<String>) -> Self {
-        Error { pos, msg: msg.into() }
+        Error {
+            pos,
+            msg: msg.into(),
+        }
     }
 }
 
