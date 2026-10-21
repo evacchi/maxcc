@@ -60,8 +60,16 @@ impl Selector<'_> {
         match stmt {
             l1::Stmt::Store { addr, value } => {
                 // Chapter 1 shape only: `*p = const`.
-                let (l1::Addr::Base { param: i, offset: 0 }, l1::Val::Imm(value)) = (addr, value) else {
-                    todo!("ch2: offsets, Scaled addresses, thread_idx.x values")
+                let (
+                    l1::Addr::Base {
+                        param: i,
+                        offset: 0,
+                    },
+                    l1::Val::Imm(value),
+                ) = (addr, value)
+                else {
+                    // TODO(human): non-zero offsets, Scaled addresses, Val::Tid values.
+                    todo!("ch2")
                 };
                 let param = param_name(&self.kernel.name, *i);
 

@@ -21,7 +21,11 @@ pub struct Param {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stmt {
     /// `ptr[index] = value;` (`*ptr = v` parses as `ptr[0] = v`)
-    Store { ptr: String, index: Expr, value: Expr },
+    Store {
+        ptr: String,
+        index: Expr,
+        value: Expr,
+    },
 }
 
 /// A u32 value.

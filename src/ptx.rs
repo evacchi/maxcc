@@ -95,9 +95,19 @@ pub enum Inst {
     /// `cvta.to.<space>.u64 dst, src;` generic address -> `space` address.
     CvtaTo { space: Space, dst: Reg, src: Reg },
     /// `add.<ty> dst, a, b;`
-    Add { ty: Type, dst: Reg, a: Reg, b: Operand },
+    Add {
+        ty: Type,
+        dst: Reg,
+        a: Reg,
+        b: Operand,
+    },
     /// `mul.wide.<ty> dst, a, b;` dst is twice as wide as `ty`.
-    MulWide { ty: Type, dst: Reg, a: Reg, b: Operand },
+    MulWide {
+        ty: Type,
+        dst: Reg,
+        a: Reg,
+        b: Operand,
+    },
     /// `ret;`
     Ret,
 }

@@ -38,5 +38,9 @@ pub enum Addr {
     /// param + offset bytes.
     Base { param: usize, offset: u32 },
     /// param + index * scale bytes. `index` is never `Imm`: constants fold into `Base`.
-    Scaled { param: usize, index: Val, scale: u32 },
+    Scaled {
+        param: usize,
+        index: Val,
+        scale: u32,
+    },
 }

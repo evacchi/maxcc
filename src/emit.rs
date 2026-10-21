@@ -69,9 +69,17 @@ fn inst(i: &Inst) -> String {
             dst,
             src,
         } => format!("cvta.to{}.u64 \t{}, {}", space(*sp), reg(*dst), reg(*src)),
-        Inst::Add { ty: t, dst, a, b } => format!("add{} \t{}, {}, {}", ty(*t), reg(*dst), reg(*a), operand(b)),
+        Inst::Add { ty: t, dst, a, b } => {
+            format!("add{} \t{}, {}, {}", ty(*t), reg(*dst), reg(*a), operand(b))
+        }
         Inst::MulWide { ty: t, dst, a, b } => {
-            format!("mul.wide{} \t{}, {}, {}", ty(*t), reg(*dst), reg(*a), operand(b))
+            format!(
+                "mul.wide{} \t{}, {}, {}",
+                ty(*t),
+                reg(*dst),
+                reg(*a),
+                operand(b)
+            )
         }
         Inst::Ret => "ret".into(),
     }
@@ -97,7 +105,10 @@ fn regs(i: &Inst) -> Vec<Reg> {
         Inst::Mov { dst, src, .. } => [Some(*dst), op_reg(src)].into_iter().flatten().collect(),
         Inst::CvtaTo { dst, src, .. } => vec![*dst, *src],
         Inst::Add { dst, a, b, .. } | Inst::MulWide { dst, a, b, .. } => {
-            [Some(*dst), Some(*a), op_reg(b)].into_iter().flatten().collect()
+            [Some(*dst), Some(*a), op_reg(b)]
+                .into_iter()
+                .flatten()
+                .collect()
         }
         Inst::Ret => vec![],
     }
