@@ -13,7 +13,7 @@ watch the test fail.
 | ch | title                          | status |
 |----|--------------------------------|--------|
 | 1  | One thread, one store          | done   |
-| 2  | Thread identity, indexing      | next   |
+| 2  | Thread identity, indexing      | in progress |
 | 3  | Expressions and loads          |        |
 | 4  | `if`                           |        |
 | 5  | `let` and assignment           |        |
@@ -33,17 +33,17 @@ watch the test fail.
   alone both give `STG`; generic `st` gives `ST`. ptxas trusts the suffix.
   `cvta` can matter for other spaces (shared, local): check in ch 7.
 
-## 2. Thread identity, indexing (next)
+## 2. Thread identity, indexing (in progress, see ch02.md)
 
 - Lang: `thread_idx.x`, `out[i] = i;`
   e.g. `kernel iota(out: *u32) { out[thread_idx.x] = thread_idx.x; }`
-- Passes: likely a new pass that makes address computation explicit
-  (`out[i]` -> base + i*4), then `select`. Design to agree first.
+- Passes: `address` (L0 -> L1, explicit byte addressing, constant indexes
+  fold into offsets), then `select` (L1 -> L-ptx).
 - GPU: grid/block/thread, `%tid.x`, 32-bit index to 64-bit byte offset
   (`mul.wide`/`cvt`), what `.reg` widths mean.
-- Runner: configurable block size, N-element buffers (breaks the
-  "one u32 per param" assumption), print arrays.
-- Open: how pointers are typed in L0 (`*u32` already parsed).
+- Runner: `./run x.ptx kernel nparams threads`; one u32 per thread per param.
+- Decisions: fold constant indexes; naive `mov` per `thread_idx.x` use;
+  widening instruction left to `select`.
 
 ## 3. Expressions and loads
 

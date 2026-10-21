@@ -1,13 +1,13 @@
-//! Pass: L0 (ast) -> L-ptx. YOURS. See docs/ch01.md.
+//! Pass: L1 -> L-ptx. YOURS. See docs/ch02.md.
 
-use crate::ast;
+use crate::l1;
 use crate::ptx::{Addr, Entry, Inst, Module, Operand, Param, Reg, RegClass, Space, Type};
 
-pub fn select(p: &ast::Program) -> Result<Module, String> {
+pub fn select(p: &l1::Program) -> Result<Module, String> {
     let k = &p.kernel;
 
     // One `.param .u64` per kernel parameter: pointers are 64-bit (.address_size 64).
-    let params = (0..k.params.len())
+    let params = (0..k.nparams)
         .map(|i| Param {
             name: param_name(&k.name, i),
             ty: Type::U64,
@@ -39,7 +39,7 @@ fn param_name(kernel: &str, i: usize) -> String {
 }
 
 struct Selector<'a> {
-    kernel: &'a ast::Kernel,
+    kernel: &'a l1::Kernel,
     body: Vec<Inst>,
     next: u32,
 }
@@ -56,14 +56,14 @@ impl Selector<'_> {
         r
     }
 
-    fn stmt(&mut self, stmt: &ast::Stmt) -> Result<(), String> {
+    fn stmt(&mut self, stmt: &l1::Stmt) -> Result<(), String> {
         match stmt {
-            ast::Stmt::Store { ptr, value } => {
-                // `ptr` must name a parameter, find index
-                let Some(i) = self.kernel.params.iter().position(|p| &p.name == ptr) else {
-                    return Err(format!("unknown pointer '{ptr}'"));
+            l1::Stmt::Store { addr, value } => {
+                // Chapter 1 shape only: `*p = const`.
+                let (l1::Addr::Base { param: i, offset: 0 }, l1::Val::Imm(value)) = (addr, value) else {
+                    todo!("ch2: offsets, Scaled addresses, thread_idx.x values")
                 };
-                let param = param_name(&self.kernel.name, i);
+                let param = param_name(&self.kernel.name, *i);
 
                 let addr = self.fresh(RegClass::B64);
                 self.body.push(Inst::Ld {
@@ -93,13 +93,13 @@ impl Selector<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lexer, parser};
+    use crate::{address, lexer, parser};
     use std::collections::HashMap;
 
     fn select_src(src: &str) -> Result<Module, String> {
         let toks = lexer::lex(src).map_err(|e| e.to_string())?;
         let ast = parser::parse(toks).map_err(|e| e.to_string())?;
-        select(&ast)
+        select(&address::address(&ast)?)
     }
 
     #[test]

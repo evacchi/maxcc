@@ -1,10 +1,12 @@
-//! usage: maxxcc [--lex|--parse|--select] <file.k>
+//! usage: maxxcc [--lex|--parse|--address|--select] <file.k>
 //! Prints PTX (or the requested stage) to stdout.
 
+mod address;
 mod ast;
 mod diag;
 mod driver;
 mod emit;
+mod l1;
 mod lexer;
 mod parser;
 mod ptx;
@@ -14,7 +16,7 @@ use std::process::ExitCode;
 
 use driver::Stage;
 
-const USAGE: &str = "usage: maxxcc [--lex|--parse|--select] <file.k>";
+const USAGE: &str = "usage: maxxcc [--lex|--parse|--address|--select] <file.k>";
 
 fn main() -> ExitCode {
     let mut stage = Stage::Emit;
@@ -23,6 +25,7 @@ fn main() -> ExitCode {
         match arg.as_str() {
             "--lex" => stage = Stage::Lex,
             "--parse" => stage = Stage::Parse,
+            "--address" => stage = Stage::Address,
             "--select" => stage = Stage::Select,
             _ => path = Some(arg),
         }

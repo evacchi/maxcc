@@ -20,6 +20,14 @@ pub struct Param {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stmt {
-    /// `*ptr = value;`
-    Store { ptr: String, value: u32 },
+    /// `ptr[index] = value;` (`*ptr = v` parses as `ptr[0] = v`)
+    Store { ptr: String, index: Expr, value: Expr },
+}
+
+/// A u32 value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Expr {
+    Int(u32),
+    /// `thread_idx.x`
+    ThreadIdxX,
 }

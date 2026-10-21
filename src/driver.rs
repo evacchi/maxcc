@@ -1,13 +1,14 @@
 //! The pipeline. Stops after `stage` and prints that stage's output.
 //!
-//!   source --lex--> tokens --parse--> L0 --select--> L-ptx --emit--> .ptx
+//!   source --lex--> tokens --parse--> L0 --address--> L1 --select--> L-ptx --emit--> .ptx
 
-use crate::{emit, lexer, parser, select};
+use crate::{address, emit, lexer, parser, select};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stage {
     Lex,
     Parse,
+    Address,
     Select,
     Emit,
 }
@@ -23,7 +24,12 @@ pub fn compile(src: &str, stage: Stage) -> Result<String, String> {
         return Ok(format!("{ast:#?}"));
     }
 
-    let ptx = select::select(&ast)?;
+    let l1 = address::address(&ast)?;
+    if stage == Stage::Address {
+        return Ok(format!("{l1:#?}"));
+    }
+
+    let ptx = select::select(&l1)?;
     if stage == Stage::Select {
         return Ok(format!("{ptx:#?}"));
     }

@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
-use crate::ptx::{Addr, Entry, Inst, Module, Operand, Reg, RegClass, Space, Type};
+use crate::ptx::{Addr, Entry, Inst, Module, Operand, Reg, RegClass, Space, Sreg, Type};
 
 const PTX_VERSION: &str = "7.0";
 const SM_TARGET: &str = "sm_70";
@@ -69,6 +69,10 @@ fn inst(i: &Inst) -> String {
             dst,
             src,
         } => format!("cvta.to{}.u64 \t{}, {}", space(*sp), reg(*dst), reg(*src)),
+        Inst::Add { ty: t, dst, a, b } => format!("add{} \t{}, {}, {}", ty(*t), reg(*dst), reg(*a), operand(b)),
+        Inst::MulWide { ty: t, dst, a, b } => {
+            format!("mul.wide{} \t{}, {}, {}", ty(*t), reg(*dst), reg(*a), operand(b))
+        }
         Inst::Ret => "ret".into(),
     }
 }
@@ -76,12 +80,12 @@ fn inst(i: &Inst) -> String {
 /// Every register an instruction mentions.
 fn regs(i: &Inst) -> Vec<Reg> {
     let addr_reg = |a: &Addr| match a {
-        Addr::Reg(r) => Some(*r),
+        Addr::Reg(r) | Addr::Offset(r, _) => Some(*r),
         Addr::Param(_) => None,
     };
     let op_reg = |o: &Operand| match o {
         Operand::Reg(r) => Some(*r),
-        Operand::Imm(_) => None,
+        Operand::Imm(_) | Operand::Sreg(_) => None,
     };
 
     match i {
@@ -92,6 +96,9 @@ fn regs(i: &Inst) -> Vec<Reg> {
             .collect(),
         Inst::Mov { dst, src, .. } => [Some(*dst), op_reg(src)].into_iter().flatten().collect(),
         Inst::CvtaTo { dst, src, .. } => vec![*dst, *src],
+        Inst::Add { dst, a, b, .. } | Inst::MulWide { dst, a, b, .. } => {
+            [Some(*dst), Some(*a), op_reg(b)].into_iter().flatten().collect()
+        }
         Inst::Ret => vec![],
     }
 }
@@ -126,6 +133,7 @@ fn addr(a: &Addr) -> String {
     match a {
         Addr::Param(name) => format!("[{name}]"),
         Addr::Reg(r) => format!("[{}]", reg(*r)),
+        Addr::Offset(r, off) => format!("[{}+{off}]", reg(*r)),
     }
 }
 
@@ -133,6 +141,13 @@ fn operand(o: &Operand) -> String {
     match o {
         Operand::Reg(r) => reg(*r),
         Operand::Imm(v) => v.to_string(),
+        Operand::Sreg(s) => sreg(*s).into(),
+    }
+}
+
+fn sreg(s: Sreg) -> &'static str {
+    match s {
+        Sreg::TidX => "%tid.x",
     }
 }
 
@@ -145,6 +160,10 @@ mod tests {
     fn emits_entry() {
         let rd = |n| Reg {
             class: RegClass::B64,
+            n,
+        };
+        let r = |n| Reg {
+            class: RegClass::B32,
             n,
         };
         let m = Module {
@@ -167,6 +186,29 @@ mod tests {
                         addr: Addr::Reg(rd(1)),
                         src: Operand::Imm(7),
                     },
+                    Inst::Mov {
+                        ty: Type::U32,
+                        dst: r(2),
+                        src: Operand::Sreg(Sreg::TidX),
+                    },
+                    Inst::MulWide {
+                        ty: Type::U32,
+                        dst: rd(3),
+                        a: r(2),
+                        b: Operand::Imm(4),
+                    },
+                    Inst::Add {
+                        ty: Type::U64,
+                        dst: rd(4),
+                        a: rd(1),
+                        b: Operand::Reg(rd(3)),
+                    },
+                    Inst::St {
+                        space: Space::Global,
+                        ty: Type::U32,
+                        addr: Addr::Offset(rd(4), 8),
+                        src: Operand::Reg(r(2)),
+                    },
                     Inst::Ret,
                 ],
             },
@@ -181,10 +223,15 @@ mod tests {
 \t.param .u64 k_param_0
 )
 {
-\t.reg .b64 \t%rd<2>;
+\t.reg .b32 \t%r<3>;
+\t.reg .b64 \t%rd<5>;
 
 \tld.param.u64 \t%rd1, [k_param_0];
 \tst.global.u32 \t[%rd1], 7;
+\tmov.u32 \t%r2, %tid.x;
+\tmul.wide.u32 \t%rd3, %r2, 4;
+\tadd.u64 \t%rd4, %rd1, %rd3;
+\tst.global.u32 \t[%rd4+8], %r2;
 \tret;
 }
 ";

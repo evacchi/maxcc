@@ -16,6 +16,9 @@ pub enum Tok {
     Semi,
     Star,
     Assign,
+    LBracket,
+    RBracket,
+    Dot,
     Eof,
 }
 
@@ -131,6 +134,9 @@ impl Lexer {
             ';' => Tok::Semi,
             '*' => Tok::Star,
             '=' => Tok::Assign,
+            '[' => Tok::LBracket,
+            ']' => Tok::RBracket,
+            '.' => Tok::Dot,
             c => return Err(Error::new(pos, format!("unexpected character '{c}'"))),
         };
         Ok(tok)

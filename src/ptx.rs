@@ -53,6 +53,14 @@ pub struct Reg {
 pub enum Operand {
     Reg(Reg),
     Imm(u64),
+    Sreg(Sreg),
+}
+
+/// Special (read-only, per-thread) register.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sreg {
+    /// `%tid.x`: thread index within the block.
+    TidX,
 }
 
 /// The `[...]` in loads and stores.
@@ -62,6 +70,8 @@ pub enum Addr {
     Param(String),
     /// `[%rd2]`
     Reg(Reg),
+    /// `[%rd2+12]`
+    Offset(Reg, u32),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,6 +94,10 @@ pub enum Inst {
     Mov { ty: Type, dst: Reg, src: Operand },
     /// `cvta.to.<space>.u64 dst, src;` generic address -> `space` address.
     CvtaTo { space: Space, dst: Reg, src: Reg },
+    /// `add.<ty> dst, a, b;`
+    Add { ty: Type, dst: Reg, a: Reg, b: Operand },
+    /// `mul.wide.<ty> dst, a, b;` dst is twice as wide as `ty`.
+    MulWide { ty: Type, dst: Reg, a: Reg, b: Operand },
     /// `ret;`
     Ret,
 }

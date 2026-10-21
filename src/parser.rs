@@ -3,9 +3,11 @@
 //! program := kernel EOF
 //! kernel  := 'kernel' IDENT '(' (param (',' param)*)? ')' '{' stmt* '}'
 //! param   := IDENT ':' '*' 'u32'
-//! stmt    := '*' IDENT '=' INT ';'
+//! stmt    := '*' IDENT '=' expr ';'          (sugar for IDENT '[' 0 ']')
+//!          | IDENT '[' expr ']' '=' expr ';'
+//! expr    := INT | 'thread_idx' '.' 'x'
 
-use crate::ast::{Kernel, Param, Program, Stmt};
+use crate::ast::{Expr, Kernel, Param, Program, Stmt};
 use crate::diag::Error;
 use crate::lexer::{Tok, Token};
 
@@ -92,16 +94,35 @@ impl Parser {
     }
 
     fn stmt(&mut self) -> Result<Stmt, Error> {
-        self.expect(Tok::Star)?;
-        let ptr = self.ident()?;
-        self.expect(Tok::Assign)?;
-
-        let Tok::Int(value) = self.bump() else {
-            return Err(self.err("expected integer literal".into()));
+        // `*p` is `p[0]`.
+        let (ptr, index) = if self.eat(&Tok::Star) {
+            (self.ident()?, Expr::Int(0))
+        } else {
+            let ptr = self.ident()?;
+            self.expect(Tok::LBracket)?;
+            let index = self.expr()?;
+            self.expect(Tok::RBracket)?;
+            (ptr, index)
         };
+
+        self.expect(Tok::Assign)?;
+        let value = self.expr()?;
         self.expect(Tok::Semi)?;
 
-        Ok(Stmt::Store { ptr, value })
+        Ok(Stmt::Store { ptr, index, value })
+    }
+
+    fn expr(&mut self) -> Result<Expr, Error> {
+        let pos = self.toks[self.at].pos;
+        match self.bump() {
+            Tok::Int(v) => Ok(Expr::Int(v)),
+            Tok::Ident(name) if name == "thread_idx" => {
+                self.expect(Tok::Dot)?;
+                self.expect(Tok::Ident("x".into()))?;
+                Ok(Expr::ThreadIdxX)
+            }
+            t => Err(Error::new(pos, format!("expected expression, found {t:?}"))),
+        }
     }
 }
 
@@ -122,10 +143,27 @@ mod tests {
             params: vec![Param { name: "out".into() }],
             body: vec![Stmt::Store {
                 ptr: "out".into(),
-                value: 42,
+                index: Expr::Int(0),
+                value: Expr::Int(42),
             }],
         };
         assert_eq!(p.kernel, want);
+    }
+
+    #[test]
+    fn parses_iota() {
+        let p = parse_src(include_str!("../examples/iota.k")).unwrap();
+        let want = Stmt::Store {
+            ptr: "out".into(),
+            index: Expr::ThreadIdxX,
+            value: Expr::ThreadIdxX,
+        };
+        assert_eq!(p.kernel.body, [want]);
+    }
+
+    #[test]
+    fn rejects_unknown_special() {
+        assert!(parse_src("kernel k(p: *u32) { p[thread_idx.y] = 1; }").is_err());
     }
 
     #[test]
