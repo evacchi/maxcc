@@ -13,7 +13,7 @@ watch the test fail.
 | ch | title                          | status |
 |----|--------------------------------|--------|
 | 1  | One thread, one store          | done   |
-| 2  | Thread identity, indexing      | in progress |
+| 2  | Thread identity, indexing      | done   |
 | 3  | Expressions and loads          |        |
 | 4  | `if`                           |        |
 | 5  | `let` and assignment           |        |
@@ -33,7 +33,7 @@ watch the test fail.
   alone both give `STG`; generic `st` gives `ST`. ptxas trusts the suffix.
   `cvta` can matter for other spaces (shared, local): check in ch 7.
 
-## 2. Thread identity, indexing (in progress, see ch02.md)
+## 2. Thread identity, indexing (done, see ch02.md)
 
 - Lang: `thread_idx.x`, `out[i] = i;`
   e.g. `kernel iota(out: *u32) { out[thread_idx.x] = thread_idx.x; }`
@@ -41,9 +41,14 @@ watch the test fail.
   fold into offsets), then `select` (L1 -> L-ptx).
 - GPU: grid/block/thread, `%tid.x`, 32-bit index to 64-bit byte offset
   (`mul.wide`/`cvt`), what `.reg` widths mean.
-- Runner: `./run x.ptx kernel nparams threads`; one u32 per thread per param.
+- Runner: `./run x.ptx kernel nparams threads [blocks]`; one u32 per thread
+  per param.
 - Decisions: fold constant indexes; naive `mov` per `thread_idx.x` use;
   widening instruction left to `select`.
+- Findings (sm_70, details in ch02.md): ptxas merges the two `S2R`, fuses
+  `ld.param`+`cvta`+`mul.wide`+`add` into one `IMAD.WIDE.U32`; 1025 threads
+  fail at launch; 2 blocks of 32 both write slots 0..31 (`%tid.x` is per
+  block). Same-address race: stable per launch shape, not predictable.
 
 ## 3. Expressions and loads
 

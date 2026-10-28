@@ -111,3 +111,51 @@ pub enum Inst {
     /// `ret;`
     Ret,
 }
+
+impl Inst {
+    /// The register this instruction writes, if any.
+    pub fn defs(&self) -> Option<Reg> {
+        match self {
+            Inst::Ld { dst, .. }
+            | Inst::Mov { dst, .. }
+            | Inst::CvtaTo { dst, .. }
+            | Inst::Add { dst, .. }
+            | Inst::MulWide { dst, .. } => Some(*dst),
+            Inst::St { .. } | Inst::Ret => None,
+        }
+    }
+
+    /// Every register this instruction reads: value operands, address
+    /// registers, conversion inputs. Immediates and special registers are not uses.
+    pub fn uses(&self) -> Vec<Reg> {
+        match self {
+            Inst::Ld { addr, .. } => addr.reg().into_iter().collect(),
+            Inst::St { addr, src, .. } => addr.reg().into_iter().chain(src.reg()).collect(),
+            Inst::Mov { src, .. } => src.reg().into_iter().collect(),
+            Inst::CvtaTo { src, .. } => vec![*src],
+            Inst::Add { a, b, .. } | Inst::MulWide { a, b, .. } => {
+                [*a].into_iter().chain(b.reg()).collect()
+            }
+            Inst::Ret => vec![],
+        }
+    }
+}
+
+impl Addr {
+    /// The register inside `[...]`, if any.
+    fn reg(&self) -> Option<Reg> {
+        match self {
+            Addr::Reg(r) | Addr::Offset(r, _) => Some(*r),
+            Addr::Param(_) => None,
+        }
+    }
+}
+
+impl Operand {
+    fn reg(&self) -> Option<Reg> {
+        match self {
+            Operand::Reg(r) => Some(*r),
+            Operand::Imm(_) | Operand::Sreg(_) => None,
+        }
+    }
+}

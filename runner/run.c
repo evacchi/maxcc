@@ -1,15 +1,18 @@
-// Load a PTX file, launch `kernel<<<1, threads>>>` with one zeroed buffer
-// of `threads` u32 per parameter, print each buffer afterwards.
+// Load a PTX file, launch `kernel<<<blocks, threads>>>` with one zeroed buffer
+// of `blocks * threads` u32 per parameter, print each buffer afterwards.
 //
 // build (on the NVIDIA box):  cc run.c -o run -I/usr/local/cuda/include -lcuda
-// usage:                      ./run file.ptx kernel [nparams [threads]]
+// usage:                      ./run file.ptx kernel [nparams [threads [blocks]]]
 
 #include <cuda.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #define MAX_PARAMS 8
+#ifndef MAX_THREADS // override with -DMAX_THREADS=N to probe the limit
 #define MAX_THREADS 1024 // per block, all current GPUs
+#endif
+#define MAX_BLOCKS 64 // ours, keeps output readable
 #define LOG_SIZE 8192
 
 #define CHECK(call)                                                       \
@@ -46,7 +49,7 @@ static char *slurp(const char *path) {
 
 int main(int argc, char **argv) {
     if (argc < 3) {
-        fprintf(stderr, "usage: %s file.ptx kernel [nparams [threads]]\n", argv[0]);
+        fprintf(stderr, "usage: %s file.ptx kernel [nparams [threads [blocks]]]\n", argv[0]);
         return 2;
     }
     int nparams = argc > 3 ? atoi(argv[3]) : 1;
@@ -59,7 +62,13 @@ int main(int argc, char **argv) {
         fprintf(stderr, "threads must be 1..%d\n", MAX_THREADS);
         return 2;
     }
-    size_t bytes = threads * sizeof(unsigned);
+    int blocks = argc > 5 ? atoi(argv[5]) : 1;
+    if (blocks < 1 || blocks > MAX_BLOCKS) {
+        fprintf(stderr, "blocks must be 1..%d\n", MAX_BLOCKS);
+        return 2;
+    }
+    int slots = blocks * threads;
+    size_t bytes = slots * sizeof(unsigned);
 
     // Device 0, its primary context.
     CUdevice dev;
@@ -83,24 +92,25 @@ int main(int argc, char **argv) {
     CUfunction fn;
     CHECK(cuModuleGetFunction(&fn, mod, argv[2]));
 
-    // One zeroed u32 array in global memory per parameter, one slot per thread.
+    // One zeroed u32 array in global memory per parameter, one slot per thread
+    // across all blocks.
     CUdeviceptr bufs[MAX_PARAMS];
     void *args[MAX_PARAMS];
     for (int i = 0; i < nparams; i++) {
         CHECK(cuMemAlloc(&bufs[i], bytes));
-        CHECK(cuMemsetD32(bufs[i], 0, threads));
+        CHECK(cuMemsetD32(bufs[i], 0, slots));
         args[i] = &bufs[i];
     }
 
-    // grid 1x1x1, block threads x 1 x 1.
-    CHECK(cuLaunchKernel(fn, 1, 1, 1, threads, 1, 1, 0, NULL, args, NULL));
+    // grid blocks x 1 x 1, block threads x 1 x 1.
+    CHECK(cuLaunchKernel(fn, blocks, 1, 1, threads, 1, 1, 0, NULL, args, NULL));
     CHECK(cuCtxSynchronize());
 
-    unsigned host[MAX_THREADS];
+    unsigned *host = malloc(bytes);
     for (int i = 0; i < nparams; i++) {
         CHECK(cuMemcpyDtoH(host, bufs[i], bytes));
         printf("param %d =", i);
-        for (int t = 0; t < threads; t++) {
+        for (int t = 0; t < slots; t++) {
             printf(" %u", host[t]);
         }
         printf("\n");

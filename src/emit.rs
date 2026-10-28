@@ -87,31 +87,7 @@ fn inst(i: &Inst) -> String {
 
 /// Every register an instruction mentions.
 fn regs(i: &Inst) -> Vec<Reg> {
-    let addr_reg = |a: &Addr| match a {
-        Addr::Reg(r) | Addr::Offset(r, _) => Some(*r),
-        Addr::Param(_) => None,
-    };
-    let op_reg = |o: &Operand| match o {
-        Operand::Reg(r) => Some(*r),
-        Operand::Imm(_) | Operand::Sreg(_) => None,
-    };
-
-    match i {
-        Inst::Ld { dst, addr, .. } => [Some(*dst), addr_reg(addr)].into_iter().flatten().collect(),
-        Inst::St { addr, src, .. } => [addr_reg(addr), op_reg(src)]
-            .into_iter()
-            .flatten()
-            .collect(),
-        Inst::Mov { dst, src, .. } => [Some(*dst), op_reg(src)].into_iter().flatten().collect(),
-        Inst::CvtaTo { dst, src, .. } => vec![*dst, *src],
-        Inst::Add { dst, a, b, .. } | Inst::MulWide { dst, a, b, .. } => {
-            [Some(*dst), Some(*a), op_reg(b)]
-                .into_iter()
-                .flatten()
-                .collect()
-        }
-        Inst::Ret => vec![],
-    }
+    i.defs().into_iter().chain(i.uses()).collect()
 }
 
 /// (register name prefix, `.reg` declaration type)
