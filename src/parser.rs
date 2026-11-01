@@ -5,9 +5,12 @@
 //! param   := IDENT ':' '*' 'u32'
 //! stmt    := '*' IDENT '=' expr ';'          (sugar for IDENT '[' 0 ']')
 //!          | IDENT '[' expr ']' '=' expr ';'
-//! expr    := INT | 'thread_idx' '.' 'x'
+//! expr    := term ('+' term)*
+//! term    := atom ('*' atom)*
+//! atom    := INT | special | '(' expr ')'
+//! special := ('thread_idx' | 'block_idx' | 'block_dim') '.' 'x'
 
-use crate::ast::{Expr, Kernel, Param, Program, Stmt};
+use crate::ast::{BinOp, Expr, Kernel, Param, Program, Special, Stmt};
 use crate::diag::Error;
 use crate::lexer::{Tok, Token};
 
@@ -112,17 +115,58 @@ impl Parser {
         Ok(Stmt::Store { ptr, index, value })
     }
 
+    /// One loop per precedence level: `+` binds looser than `*`,
+    /// both associate left. `1 + 2 * 3` is `1 + (2 * 3)`.
     fn expr(&mut self) -> Result<Expr, Error> {
+        let mut lhs = self.term()?;
+        while self.eat(&Tok::Plus) {
+            lhs = bin(BinOp::Add, lhs, self.term()?);
+        }
+        Ok(lhs)
+    }
+
+    fn term(&mut self) -> Result<Expr, Error> {
+        let mut lhs = self.atom()?;
+        while self.eat(&Tok::Star) {
+            lhs = bin(BinOp::Mul, lhs, self.atom()?);
+        }
+        Ok(lhs)
+    }
+
+    fn atom(&mut self) -> Result<Expr, Error> {
         let pos = self.toks[self.at].pos;
         match self.bump() {
             Tok::Int(v) => Ok(Expr::Int(v)),
-            Tok::Ident(name) if name == "thread_idx" => {
-                self.expect(Tok::Dot)?;
-                self.expect(Tok::Ident("x".into()))?;
-                Ok(Expr::ThreadIdxX)
+            Tok::LParen => {
+                let e = self.expr()?;
+                self.expect(Tok::RParen)?;
+                Ok(e)
             }
+            Tok::Ident(name) => self.special(&name).map(Expr::Special),
             t => Err(Error::new(pos, format!("expected expression, found {t:?}"))),
         }
+    }
+
+    /// `name` has been consumed; parses the `.x` that follows.
+    fn special(&mut self, name: &str) -> Result<Special, Error> {
+        let pos = self.toks[self.at - 1].pos;
+        let s = match name {
+            "thread_idx" => Special::ThreadIdxX,
+            "block_idx" => Special::BlockIdxX,
+            "block_dim" => Special::BlockDimX,
+            _ => return Err(Error::new(pos, format!("unknown name '{name}'"))),
+        };
+        self.expect(Tok::Dot)?;
+        self.expect(Tok::Ident("x".into()))?;
+        Ok(s)
+    }
+}
+
+fn bin(op: BinOp, lhs: Expr, rhs: Expr) -> Expr {
+    Expr::Bin {
+        op,
+        lhs: Box::new(lhs),
+        rhs: Box::new(rhs),
     }
 }
 
@@ -155,10 +199,58 @@ mod tests {
         let p = parse_src(include_str!("../examples/iota.k")).unwrap();
         let want = Stmt::Store {
             ptr: "out".into(),
-            index: Expr::ThreadIdxX,
-            value: Expr::ThreadIdxX,
+            index: Expr::Special(Special::ThreadIdxX),
+            value: Expr::Special(Special::ThreadIdxX),
         };
         assert_eq!(p.kernel.body, [want]);
+    }
+
+    /// The index of the single store in `src`.
+    fn index_of(src: &str) -> Expr {
+        let p = parse_src(src).unwrap();
+        let [Stmt::Store { index, .. }] = &p.kernel.body[..] else {
+            panic!("expected one store");
+        };
+        index.clone()
+    }
+
+    #[test]
+    fn mul_binds_tighter_than_add() {
+        let want = bin(
+            BinOp::Add,
+            Expr::Int(1),
+            bin(BinOp::Mul, Expr::Int(2), Expr::Int(3)),
+        );
+        assert_eq!(index_of("kernel k(p: *u32) { p[1 + 2 * 3] = 0; }"), want);
+    }
+
+    #[test]
+    fn parens_and_left_assoc() {
+        let want = bin(
+            BinOp::Mul,
+            bin(BinOp::Add, Expr::Int(1), Expr::Int(2)),
+            Expr::Int(3),
+        );
+        assert_eq!(index_of("kernel k(p: *u32) { p[(1 + 2) * 3] = 0; }"), want);
+
+        let want = bin(
+            BinOp::Add,
+            bin(BinOp::Add, Expr::Int(1), Expr::Int(2)),
+            Expr::Int(3),
+        );
+        assert_eq!(index_of("kernel k(p: *u32) { p[1 + 2 + 3] = 0; }"), want);
+    }
+
+    #[test]
+    fn parses_global_index() {
+        let s = |sp| Expr::Special(sp);
+        let want = bin(
+            BinOp::Add,
+            bin(BinOp::Mul, s(Special::BlockIdxX), s(Special::BlockDimX)),
+            s(Special::ThreadIdxX),
+        );
+        let src = "kernel k(p: *u32) { p[block_idx.x * block_dim.x + thread_idx.x] = 0; }";
+        assert_eq!(index_of(src), want);
     }
 
     #[test]

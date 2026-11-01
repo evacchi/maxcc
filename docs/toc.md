@@ -14,7 +14,7 @@ watch the test fail.
 |----|--------------------------------|--------|
 | 1  | One thread, one store          | done   |
 | 2  | Thread identity, indexing      | done   |
-| 3  | Expressions and loads          |        |
+| 3  | Expressions and loads          | in progress |
 | 4  | `if`                           |        |
 | 5  | `let` and assignment           |        |
 | 6  | `while`                        |        |
@@ -50,12 +50,14 @@ watch the test fail.
   fail at launch; 2 blocks of 32 both write slots 0..31 (`%tid.x` is per
   block). Same-address race: stable per launch shape, not predictable.
 
-## 3. Expressions and loads
+## 3. Expressions and loads (in progress, see ch03.md)
 
-- Lang: `+ - *`, `block_idx.x`, `block_dim.x`, reading `a[i]`.
-  Goal: `c[i] = a[i] + b[i]` on u32, unguarded.
-- Passes: flatten nested expressions to three-address form; select
-  `ld.global`, `add`, `mad`.
+- 3a. Lang: `+ *`, parens, `block_idx.x`, `block_dim.x`. Goal: global iota,
+  2 blocks of 32.
+- 3b. Lang: reading `a[i]`. Goal: `c[i] = a[i] + b[i]` on u32, unguarded.
+- Passes: `flatten` (L0 -> L0-flat, three-address) before `address`;
+  select `ld.global`, `add`, `mul.lo`.
+- Decision: `flatten` is its own pass, so `address` sees flat values only.
 - GPU: global index = block*dim + tid, multiple blocks, coalescing (first look).
 - Open: `verify_ptx` pass once there are enough rules (defined-before-use,
   register widths). See ch 1 test rules.

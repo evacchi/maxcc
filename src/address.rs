@@ -1,6 +1,6 @@
 //! Pass: L0 -> L1. YOURS. Makes addressing explicit. See docs/ch02.md.
 
-use crate::ast::Expr;
+use crate::ast::{Expr, Special};
 use crate::l1::{Addr, Val};
 use crate::{ast, l1};
 
@@ -42,11 +42,12 @@ fn stmt(k: &ast::Kernel, s: &ast::Stmt) -> Result<l1::Stmt, String> {
                 .checked_mul(ELEM_SIZE)
                 .ok_or_else(|| format!("index {i} overflows the byte offset"))?,
         },
-        Expr::ThreadIdxX => Addr::Scaled {
+        Expr::Special(Special::ThreadIdxX) => Addr::Scaled {
             param,
             index: Val::Tid,
             scale: ELEM_SIZE,
         },
+        _ => todo!("ch3: address consumes flat IR"),
     };
 
     Ok(l1::Stmt::Store {
@@ -58,7 +59,8 @@ fn stmt(k: &ast::Kernel, s: &ast::Stmt) -> Result<l1::Stmt, String> {
 fn val(value: &Expr) -> Val {
     match value {
         Expr::Int(x) => Val::Imm(*x),
-        Expr::ThreadIdxX => Val::Tid,
+        Expr::Special(Special::ThreadIdxX) => Val::Tid,
+        _ => todo!("ch3: address consumes flat IR"),
     }
 }
 

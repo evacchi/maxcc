@@ -32,6 +32,28 @@ pub enum Stmt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
     Int(u32),
-    /// `thread_idx.x`
+    Special(Special),
+    /// `lhs op rhs`, wrapping on overflow.
+    Bin {
+        op: BinOp,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
+}
+
+/// Read-only per-thread values the hardware provides.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Special {
+    /// `thread_idx.x`: thread index within the block.
     ThreadIdxX,
+    /// `block_idx.x`: block index within the grid.
+    BlockIdxX,
+    /// `block_dim.x`: threads per block.
+    BlockDimX,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinOp {
+    Add,
+    Mul,
 }
